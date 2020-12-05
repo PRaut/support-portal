@@ -20,6 +20,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.dev.neo.supportportal.constant.SecurityConstant;
 import com.dev.neo.supportportal.utility.JWTTokenProvider;
 
+@Component
 public class JwtAuthorizationFilter extends OncePerRequestFilter
 {
 	private JWTTokenProvider jwtTokenProvider;
