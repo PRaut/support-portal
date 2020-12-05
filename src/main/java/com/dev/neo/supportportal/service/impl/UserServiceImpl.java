@@ -1,5 +1,7 @@
 package com.dev.neo.supportportal.service.impl;
 
+import java.util.Date;
+
 import javax.transaction.Transactional;
 
 import org.slf4j.Logger;
@@ -18,7 +20,7 @@ import com.dev.neo.supportportal.service.UserService;
 
 @Service
 @Transactional
-@Qualifier("UserDetailsService")
+@Qualifier("userDetailsService")
 public class UserServiceImpl implements UserService, UserDetailsService
 {
 	private Logger LOGGER = LoggerFactory.getLogger(getClass());
