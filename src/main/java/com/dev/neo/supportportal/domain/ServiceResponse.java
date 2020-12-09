@@ -1,10 +1,15 @@
 package com.dev.neo.supportportal.domain;
 
+import java.util.Date;
+
 import org.springframework.http.HttpStatus;
-import org.springframework.web.client.HttpStatusCodeException;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
 
 public class ServiceResponse
 {
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "MM-dd-yyyy hh:mm:ss") 
+	private Date timeStamp;
 	private int httpStatusCode; // 200,400, 500
 	private HttpStatus httpStatus;
 	private String reason;
@@ -21,6 +26,7 @@ public class ServiceResponse
 		this.httpStatus = httpStatus;
 		this.reason = reason;
 		this.message = message;
+		this.timeStamp = new Date();
 	}
 
 	public int getHttpStatusCode()
