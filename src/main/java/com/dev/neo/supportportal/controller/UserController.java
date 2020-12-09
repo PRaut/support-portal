@@ -8,7 +8,7 @@ import com.dev.neo.supportportal.exception.domain.ExceptionHandling;
 import com.dev.neo.supportportal.exception.domain.UserNotFoundException;
 
 @RestController
-@RequestMapping(value = "/user")
+@RequestMapping(path = { "/", "/user" })
 public class UserController extends ExceptionHandling
 {
 
