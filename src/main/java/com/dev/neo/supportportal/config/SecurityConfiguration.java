@@ -36,7 +36,6 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter
 	      JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint, JwtAccessDeniedHandler jwtAccessDeniedHandler,
 	     @Qualifier("userDetailsService") UserDetailsService userDetailsService, BCryptPasswordEncoder bCryptPasswordEncoder)
 	{
-		super();
 		this.jwtAuthorizationFilter = jwtAuthorizationFilter;
 		this.jwtAuthenticationEntryPoint = jwtAuthenticationEntryPoint;
 		this.jwtAccessDeniedHandler = jwtAccessDeniedHandler;
@@ -71,6 +70,7 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter
 	{
 		return super.authenticationManagerBean();
 	}
+	
 	
 	
 
