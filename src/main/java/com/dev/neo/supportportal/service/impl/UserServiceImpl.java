@@ -1,5 +1,11 @@
 package com.dev.neo.supportportal.service.impl;
 
+import static com.dev.neo.supportportal.constant.UserImplContant.DEFAULT_USER_PROFILE_IMAGE_PATH;
+import static com.dev.neo.supportportal.constant.UserImplContant.EMAIL_ALREADY_EXISTS;
+import static com.dev.neo.supportportal.constant.UserImplContant.FOUND_USER_WITH_USERNAME;
+import static com.dev.neo.supportportal.constant.UserImplContant.NO_USER_FOUND_BY_USERNAME;
+import static com.dev.neo.supportportal.constant.UserImplContant.USERNAME_ALREADY_EXISTS;
+
 import java.util.Date;
 import java.util.List;
 
@@ -25,9 +31,9 @@ import com.dev.neo.supportportal.exception.domain.EmailExistException;
 import com.dev.neo.supportportal.exception.domain.UserNotFoundException;
 import com.dev.neo.supportportal.exception.domain.UsernameExistException;
 import com.dev.neo.supportportal.repository.UserRepository;
+import com.dev.neo.supportportal.service.EmailService;
+import com.dev.neo.supportportal.service.LoginAttemptService;
 import com.dev.neo.supportportal.service.UserService;
-
-import static com.dev.neo.supportportal.constant.UserImplContant.*;
 
 @Service
 @Transactional
@@ -40,6 +46,10 @@ public class UserServiceImpl implements UserService, UserDetailsService
 	private UserRepository userRepository;
 	@Autowired
 	private BCryptPasswordEncoder passwordEncoder;
+	@Autowired
+	private LoginAttemptService loginAttemptService;
+	@Autowired
+	private EmailService emailService;
 
 	@Override
 	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException
@@ -52,6 +62,7 @@ public class UserServiceImpl implements UserService, UserDetailsService
 		}
 		else
 		{
+			validateUserLoginAttempt(user);
 			user.setLastLoginDateDisplay(user.getLastLoginDate());
 			user.setLastLoginDate(new Date());
 			userRepository.save(user);
@@ -61,6 +72,19 @@ public class UserServiceImpl implements UserService, UserDetailsService
 			return userPrincipal;
 		}
 
+	}
+
+	private void validateUserLoginAttempt(User user)
+	{
+		if(user.isNotLocked()) {
+			if(loginAttemptService.hasExceededMaxAttempts(user.getUserName())) {
+				user.setNotLocked(false);
+			}else {
+				user.setNotLocked(true);
+			}
+		}else {
+			loginAttemptService.evictUserFromLoginAttemptCache(user.getUserName());
+		}
 	}
 
 	@Override
@@ -85,6 +109,7 @@ public class UserServiceImpl implements UserService, UserDetailsService
 		user.setProfileImageUrl(getTemporaryProfileImageUrl());
 		userRepository.save(user);
 		LOGGER.info("New user password: "+ password);
+		emailService.sendMail(firstName, email, "Support portal password", password);
 		return user;
 	}
 
