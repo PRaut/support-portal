@@ -1,11 +1,25 @@
 package com.dev.neo.supportportal.service.impl;
 
-import static com.dev.neo.supportportal.constant.UserImplContant.DEFAULT_USER_PROFILE_IMAGE_PATH;
+
+import static com.dev.neo.supportportal.constant.FileConstant.DEFAULT_USER_IMAGE_PATH;
+import static com.dev.neo.supportportal.constant.FileConstant.DIRECTORY_CREATED;
+import static com.dev.neo.supportportal.constant.FileConstant.DOT;
+import static com.dev.neo.supportportal.constant.FileConstant.FILE_SAVED_IN_FILE_SYSTEM;
+import static com.dev.neo.supportportal.constant.FileConstant.JPG_EXTENSION;
+import static com.dev.neo.supportportal.constant.FileConstant.USER_FOLDER;
+import static com.dev.neo.supportportal.constant.FileConstant.USER_IMAGE_PATH;
+import static com.dev.neo.supportportal.constant.FileConstant.FORWARD_SLASH;
 import static com.dev.neo.supportportal.constant.UserImplContant.EMAIL_ALREADY_EXISTS;
 import static com.dev.neo.supportportal.constant.UserImplContant.FOUND_USER_WITH_USERNAME;
+import static com.dev.neo.supportportal.constant.UserImplContant.NO_USER_FOUND_BY_EMAIL;
 import static com.dev.neo.supportportal.constant.UserImplContant.NO_USER_FOUND_BY_USERNAME;
 import static com.dev.neo.supportportal.constant.UserImplContant.USERNAME_ALREADY_EXISTS;
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Date;
 import java.util.List;
 
@@ -22,12 +36,15 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import com.dev.neo.supportportal.constant.FileConstant;
 import com.dev.neo.supportportal.domain.User;
 import com.dev.neo.supportportal.domain.UserPrincipal;
 import com.dev.neo.supportportal.enumeration.Role;
 import com.dev.neo.supportportal.exception.domain.EmailExistException;
+import com.dev.neo.supportportal.exception.domain.EmailNotFoundException;
 import com.dev.neo.supportportal.exception.domain.UserNotFoundException;
 import com.dev.neo.supportportal.exception.domain.UsernameExistException;
 import com.dev.neo.supportportal.repository.UserRepository;
@@ -40,6 +57,8 @@ import com.dev.neo.supportportal.service.UserService;
 @Qualifier("userDetailsService")
 public class UserServiceImpl implements UserService, UserDetailsService
 {
+	
+
 	private Logger LOGGER = LoggerFactory.getLogger(getClass());
 
 	@Autowired
@@ -106,17 +125,107 @@ public class UserServiceImpl implements UserService, UserDetailsService
 		user.setNotLocked(true);
 		user.setRole(Role.ROLE_USER.name());
 		user.setAuthorities(Role.ROLE_USER.getAuthorities());
-		user.setProfileImageUrl(getTemporaryProfileImageUrl());
+		System.out.println("temp profile url set : "+ getTemporaryProfileImageUrl(userName));
+		user.setProfileImageUrl(getTemporaryProfileImageUrl(userName));
 		userRepository.save(user);
 		LOGGER.info("New user password: "+ password);
-		emailService.sendMail(firstName, email, "Support portal password", password);
+		emailService.sendNewPasswordEmail(firstName, email, password);
 		return user;
 	}
 
-	private String getTemporaryProfileImageUrl()
+	@Override
+	public User addUser(String firstName, String lastName, String username, String email, String role,
+	      boolean isNonLocked, boolean isActive, MultipartFile profileImage) throws UserNotFoundException, UsernameExistException, EmailExistException, IOException
+	{
+		validateNewUsernameAndEmail(StringUtils.EMPTY, username, email);
+		User user = new User();
+		String password = generatePassword();
+		user.setUserId(generateUserId());
+		user.setFirstName(firstName);
+		user.setLastName(lastName);
+		user.setJoinDate(new Date());
+		user.setUserName(username);
+		user.setEmail(email);
+		user.setPassword(encodePassword(password));
+		user.setActive(isActive);
+		user.setNotLocked(isNonLocked);
+		user.setRole(getRoleEnumName(role).name());
+		user.setAuthorities(getRoleEnumName(role).getAuthorities());
+		user.setProfileImageUrl(getTemporaryProfileImageUrl(username));
+		userRepository.save(user);
+		saveProfileImage(user, profileImage);
+		return user;
+	}
+
+	
+
+	@Override
+	public User updateUser(String currentUsername, String newFirstName, String newLastName, String newUsername,
+	      String newEmail, String role, boolean isNonLocked, boolean isActive, MultipartFile profileImage) throws UserNotFoundException, UsernameExistException, EmailExistException, IOException
+	{
+		User currentUser = validateNewUsernameAndEmail(currentUsername, newUsername, newEmail);
+		currentUser.setFirstName(newFirstName);
+		currentUser.setLastName(newLastName);
+		currentUser.setUserName(newUsername);
+		currentUser.setEmail(newEmail);
+		currentUser.setActive(isActive);
+		currentUser.setNotLocked(isNonLocked);
+		currentUser.setRole(getRoleEnumName(role).name());
+		currentUser.setAuthorities(getRoleEnumName(role).getAuthorities());
+		userRepository.save(currentUser);
+		saveProfileImage(currentUser, profileImage);
+		return currentUser;
+	}
+
+	@Override
+	public void deleteUser(Long id)
+	{
+		userRepository.deleteById(id);
+	}
+
+	@Override
+	public void resetPassword(String email) throws EmailNotFoundException
+	{
+		User user = findUserByEmail(email);
+		if(user == null) {
+			throw new EmailNotFoundException(NO_USER_FOUND_BY_EMAIL + email);
+		}
+		String password = generatePassword();
+		user.setPassword(encodePassword(password));
+		userRepository.save(user);
+		emailService.sendNewPasswordEmail(user.getFirstName(), user.getEmail(), password);
+	}
+
+	@Override
+	public User updateProfileImage(String username, MultipartFile profileImage) throws UserNotFoundException, UsernameExistException, EmailExistException, IOException
+	{
+		User user = validateNewUsernameAndEmail(username, null, null);
+		saveProfileImage(user, profileImage);
+		return user;
+	}
+
+	@Override
+	public List<User> getUsers()
+	{
+		return userRepository.findAll();
+	}
+
+	@Override
+	public User findByUserName(String userName)
+	{
+		return userRepository.findUserByUserName(userName);
+	}
+
+	@Override
+	public User findUserByEmail(String email)
+	{
+		return userRepository.findUserByEmail(email);
+	}
+
+	private String getTemporaryProfileImageUrl(String username)
 	{
 		// return http://localhost:8081/
-		return ServletUriComponentsBuilder.fromCurrentContextPath().path(DEFAULT_USER_PROFILE_IMAGE_PATH).toUriString();
+		return ServletUriComponentsBuilder.fromCurrentContextPath().path(DEFAULT_USER_IMAGE_PATH + username).toUriString();
 	}
 
 	private String encodePassword(String password)
@@ -171,22 +280,35 @@ public class UserServiceImpl implements UserService, UserDetailsService
 		}
 	}
 
-	@Override
-	public List<User> getUsers()
+	
+	private void saveProfileImage(User user, MultipartFile profileImage) throws IOException
 	{
-		return userRepository.findAll();
+		if(profileImage != null) {
+			Path userFolder = Paths.get(USER_FOLDER + user.getUserName()).toAbsolutePath().normalize();
+			if(!Files.exists(userFolder)){
+				Files.createDirectories(userFolder);
+				LOGGER.info(DIRECTORY_CREATED + userFolder);
+			}
+			
+			/** Delete the existing user profile image if exists */
+			Files.deleteIfExists(Paths.get(userFolder + user.getUserName() + DOT + JPG_EXTENSION));
+			/** copy actual profile data to output location */
+			Files.copy(profileImage.getInputStream(), userFolder.resolve( user.getUserName() + DOT + JPG_EXTENSION), REPLACE_EXISTING);
+			user.setProfileImageUrl(setProfileImageUrl(user.getUserName()));
+			userRepository.save(user);
+			LOGGER.info(FILE_SAVED_IN_FILE_SYSTEM + profileImage.getOriginalFilename());
+		}
 	}
 
-	@Override
-	public User findByUserName(String userName)
+	private String setProfileImageUrl(String userName)
 	{
-		return userRepository.findUserByUserName(userName);
+		return ServletUriComponentsBuilder.fromCurrentContextPath().path(USER_IMAGE_PATH + userName + FORWARD_SLASH + userName + DOT + JPG_EXTENSION).toUriString();
 	}
 
-	@Override
-	public User findUserByEmail(String email)
+	private Role getRoleEnumName(String role)
 	{
-		return userRepository.findUserByEmail(email);
+		return Role.valueOf(role.toUpperCase());
 	}
 
+	
 }
