@@ -16,12 +16,12 @@ public class EmailService
 	@Value("${spring.mail.username}")
 	private String from;
 
-	public void sendMail(String firstname, String to, String subject, String password)
+	public void sendNewPasswordEmail(String firstname, String to, String password)
 	{
 		SimpleMailMessage message = new SimpleMailMessage();
 		message.setTo(to);
 		message.setFrom(from);
-		message.setSubject(subject);
+		message.setSubject("Support portal password");
 		message.setText("Hello " + firstname + "\n\n Your password is " + password + "\n\n" + "The Support Team\n Neoquant Pvt Ltd.");
 
 		mailSender.send(message);
